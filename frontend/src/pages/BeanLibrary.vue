@@ -20,9 +20,10 @@
         <el-card class="bean-card" shadow="hover">
           <h3>{{ b.name }} <el-tag size="small" type="warning">{{ ProcessMethodMap[b.process_method] }}</el-tag></h3>
           <div class="meta">{{ b.origin || '-' }}</div>
+          <div class="note-count">关联品鉴笔记：{{ b.note_count ?? 0 }} 篇</div>
           <FlavorTags :tags="b.flavor_tags" />
           <p class="desc">{{ b.description }}</p>
-          <el-button v-if="isAdmin" size="small" type="danger" plain @click="removeBean(b.id)">删除</el-button>
+          <el-button v-if="isAdmin" size="small" type="danger" plain @click="removeBean(b)">删除</el-button>
         </el-card>
       </el-col>
     </el-row>
@@ -57,7 +58,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import { useBeanStore } from '@/stores/useBeanStore'
 import { useAuth } from '@/hooks/useAuth'
 import { createBean, deleteBean } from '@/api/bean'
-import { ProcessMethodMap, type ProcessMethod } from '@/constants/bean'
+import { ProcessMethodMap, type ProcessMethod, type CoffeeBean } from '@/constants/bean'
 
 const store = useBeanStore()
 const { isAdmin } = useAuth()
@@ -95,10 +96,15 @@ async function addBean() {
   showAdd.value = false
   await load()
 }
-async function removeBean(id: number) {
-  await deleteBean(id)
-  ElMessage.success('已删除')
-  await load()
+async function removeBean(b: CoffeeBean) {
+  try {
+    await deleteBean(b.id)
+    ElMessage.success('已撤下')
+    await load()
+  } catch {
+    // 被引用时后端返回 409 并在 message 中给出笔记数量，
+    // 全局请求拦截器已统一弹出该提示，这里无需重复处理。
+  }
 }
 </script>
 
@@ -106,5 +112,6 @@ async function removeBean(id: number) {
 .page { max-width: 1200px; margin: 0 auto; }
 .bean-card { margin-bottom: 16px; }
 .meta { color: #999; font-size: 12px; margin: 6px 0; }
+.note-count { color: #7b4b2a; font-size: 13px; margin: 4px 0; font-weight: 500; }
 .desc { color: #666; margin-top: 8px; }
 </style>

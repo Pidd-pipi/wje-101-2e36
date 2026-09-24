@@ -17,4 +17,5 @@ export interface CoffeeBean {
   flavor_tags: string
   description: string
   created_at: string
+  note_count?: number
 }

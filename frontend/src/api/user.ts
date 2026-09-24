@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 import type { UserInfo } from '@/constants/user'
-import type { TastingNote } from '@/constants/note'
+import type { NoteItem } from '@/constants/note'
 
 export interface LoginResult { token: string; user: UserInfo }
 
@@ -12,7 +12,7 @@ export interface ProfileData {
   followers: number
   following: number
   likes_received: number
-  notes: TastingNote[]
+  notes: NoteItem[]
 }
 
 export function register(payload: { username: string; email: string; password: string; bio?: string }) {

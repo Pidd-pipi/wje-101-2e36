@@ -100,14 +100,25 @@ func (h *UserHandler) Profile(c *gin.Context) {
 	origins, _ := h.noteSvc.TopOrigins(uint(id))
 	followers, following, _ := h.followSvc.Counts(uint(id))
 	likesReceived, _ := h.likeSvc.CountByUserNotes(uint(id))
+	beanMap, _ := h.noteSvc.BeanInfoMap(notes)
+	noteItems := make([]gin.H, 0, len(notes))
+	for i := range notes {
+		entry := gin.H{"note": notes[i]}
+		if notes[i].CoffeeBeanID != nil {
+			if info, ok := beanMap[*notes[i].CoffeeBeanID]; ok {
+				entry["bean"] = info
+			}
+		}
+		noteItems = append(noteItems, entry)
+	}
 	c.JSON(http.StatusOK, dto.OK(gin.H{
-		"user":          u,
-		"note_count":    len(notes),
-		"avg_score":     avg,
-		"top_origins":   origins,
-		"followers":     followers,
-		"following":     following,
+		"user":           u,
+		"note_count":     len(notes),
+		"avg_score":      avg,
+		"top_origins":    origins,
+		"followers":      followers,
+		"following":      following,
 		"likes_received": likesReceived,
-		"notes":         notes,
+		"notes":          noteItems,
 	}))
 }

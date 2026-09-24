@@ -24,11 +24,11 @@
     </el-card>
     <h3>品鉴历史</h3>
     <el-row :gutter="16">
-      <el-col v-for="n in data.notes" :key="n.id" :xs="24" :sm="12" :md="8">
-        <el-card class="note-card" shadow="hover" @click="$router.push(`/note/${n.id}`)">
-          <h4>{{ n.coffee_name }}</h4>
-          <div class="meta">{{ n.origin }} · {{ RoastLevelMap[n.roast_level] }}</div>
-          <ScoreStars :model-value="n.overall_score" />
+      <el-col v-for="item in data.notes" :key="item.note.id" :xs="24" :sm="12" :md="8">
+        <el-card class="note-card" shadow="hover" @click="$router.push(`/note/${item.note.id}`)">
+          <h4>{{ item.bean?.name || item.note.coffee_name }}</h4>
+          <div class="meta">{{ (item.bean ? item.bean.origin : item.note.origin) || '-' }} · {{ RoastLevelMap[item.note.roast_level] }}</div>
+          <ScoreStars :model-value="item.note.overall_score" />
         </el-card>
       </el-col>
     </el-row>

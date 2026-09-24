@@ -13,7 +13,9 @@ type CoffeeBeanRepository struct{ db *gorm.DB }
 func NewCoffeeBeanRepository(db *gorm.DB) *CoffeeBeanRepository { return &CoffeeBeanRepository{db: db} }
 
 // Create inserts a bean.
-func (r *CoffeeBeanRepository) Create(b *model.CoffeeBean) error { return translate(r.db.Create(b).Error) }
+func (r *CoffeeBeanRepository) Create(b *model.CoffeeBean) error {
+	return translate(r.db.Create(b).Error)
+}
 
 // FindByID locates a bean by id.
 func (r *CoffeeBeanRepository) FindByID(id uint) (*model.CoffeeBean, error) {
@@ -25,7 +27,9 @@ func (r *CoffeeBeanRepository) FindByID(id uint) (*model.CoffeeBean, error) {
 }
 
 // Update persists a bean.
-func (r *CoffeeBeanRepository) Update(b *model.CoffeeBean) error { return translate(r.db.Save(b).Error) }
+func (r *CoffeeBeanRepository) Update(b *model.CoffeeBean) error {
+	return translate(r.db.Save(b).Error)
+}
 
 // Delete removes a bean.
 func (r *CoffeeBeanRepository) Delete(id uint) error {
@@ -61,4 +65,46 @@ func (r *CoffeeBeanRepository) List(origin, process, keyword string, page, pageS
 		return nil, 0, err
 	}
 	return items, total, nil
+}
+
+// CountNotes returns how many tasting notes are bound to the bean.
+func (r *CoffeeBeanRepository) CountNotes(beanID uint) (int64, error) {
+	var count int64
+	if err := r.db.Model(&model.TastingNote{}).
+		Where("coffee_bean_id = ?", beanID).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// CountNotesByIDs returns note counts keyed by bean id.
+func (r *CoffeeBeanRepository) CountNotesByIDs(beanIDs []uint) (map[uint]int64, error) {
+	counts := make(map[uint]int64)
+	if len(beanIDs) == 0 {
+		return counts, nil
+	}
+	type row struct {
+		CoffeeBeanID uint
+		Count        int64
+	}
+	var rows []row
+	if err := r.db.Model(&model.TastingNote{}).
+		Select("coffee_bean_id, COUNT(*) AS count").
+		Where("coffee_bean_id IN ?", beanIDs).
+		Group("coffee_bean_id").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, x := range rows {
+		counts[x.CoffeeBeanID] = x.Count
+	}
+	return counts, nil
+}
+
+// FindByName locates a bean by exact name match.
+func (r *CoffeeBeanRepository) FindByName(name string) (*model.CoffeeBean, error) {
+	var b model.CoffeeBean
+	if err := translate(r.db.Where("name = ?", name).First(&b).Error); err != nil {
+		return nil, err
+	}
+	return &b, nil
 }

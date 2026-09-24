@@ -8,7 +8,7 @@ import (
 )
 
 func TestNoteCreateInvalidRoast(t *testing.T) {
-	svc := NewNoteService(repository.NewTastingNoteRepository(nil), newTestLogger())
+	svc := NewNoteService(repository.NewTastingNoteRepository(nil), repository.NewCoffeeBeanRepository(nil), newTestLogger())
 	n := &model.TastingNote{CoffeeName: "测试", RoastLevel: "blue"}
 	if _, err := svc.Create(1, n); err == nil {
 		t.Error("expected error for invalid roast level")

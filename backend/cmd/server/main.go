@@ -37,6 +37,10 @@ func main() {
 		logger.Error("failed to seed database", "error", err)
 		os.Exit(1)
 	}
+	if err := backfillNoteBeans(db, logger); err != nil {
+		logger.Error("failed to backfill note bean bindings", "error", err)
+		os.Exit(1)
+	}
 
 	r := router.Setup(cfg, db, logger)
 	r.Static("/uploads", cfg.UploadDir)

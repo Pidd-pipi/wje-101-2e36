@@ -132,10 +132,17 @@ wje-101/
 | GET | /api/v1/recipes | 公开 | 冲煮配方列表/筛选 |
 | GET | /api/v1/recipes/:id | 公开 | 冲煮配方详情 |
 | POST | /api/v1/recipes | 登录（限流） | 分享冲煮配方 |
-| GET | /api/v1/beans | 公开 | 咖啡豆库列表/筛选 |
+| GET | /api/v1/beans | 公开 | 咖啡豆库列表/筛选（含每只豆种的关联笔记数 note_count） |
 | POST | /api/v1/beans | admin（限流） | 新增咖啡豆 |
-| PUT | /api/v1/beans/:id | admin | 更新咖啡豆 |
-| DELETE | /api/v1/beans/:id | admin | 删除咖啡豆 |
+| PUT | /api/v1/beans/:id | admin | 更新咖啡豆（改名/改产地后，已绑定笔记实时展示新信息，笔记文字与评分不被改写） |
+| DELETE | /api/v1/beans/:id | admin | 撤下咖啡豆；仍被品鉴笔记引用时返回 409 并在 message 中给出引用数量 |
+
+### 笔记与豆种绑定规则
+
+- 品鉴笔记通过 `coffee_bean_id` 绑定豆种（可为空）；创建/编辑笔记时携带选中的豆种 ID，服务端校验豆种存在。
+- 笔记详情/列表接口在绑定状态下额外返回 `bean`（豆种库中的最新名称、产地、处理法），页面优先展示该实时信息；笔记自身的 `coffee_name`、`origin` 快照与品鉴文字、评分、图片不随豆种改名而改写。
+- 服务每次启动时执行一次历史数据回填：未绑定的旧笔记按 `coffee_name` 与豆种 `name` **精确匹配**补上关系，匹配不到的保持未绑定原样。
+- 撤下豆种前校验引用计数：被引用则拒绝并明确提示「N 篇笔记仍在引用」，未被引用时正常撤下。
 
 ## 枚举出现位置清单
 

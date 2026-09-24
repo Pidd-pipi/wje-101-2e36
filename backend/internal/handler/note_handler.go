@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 
 	"github.com/wjecoffeetaste/wjecoffeetaste/internal/constants"
 	"github.com/wjecoffeetaste/wjecoffeetaste/internal/dto"
@@ -17,9 +19,9 @@ import (
 
 // NoteHandler exposes tasting note endpoints.
 type NoteHandler struct {
-	svc    *service.NoteService
+	svc     *service.NoteService
 	likeSvc *service.LikeService
-	logger *slog.Logger
+	logger  *slog.Logger
 }
 
 // NewNoteHandler creates a NoteHandler.
@@ -46,10 +48,21 @@ func (h *NoteHandler) List(c *gin.Context) {
 		c.Error(err)
 		return
 	}
+	beanMap, err := h.svc.BeanInfoMap(items)
+	if err != nil {
+		c.Error(err)
+		return
+	}
 	result := make([]gin.H, 0, len(items))
 	for _, n := range items {
 		likes, _ := h.likeSvc.CountByNote(n.ID)
-		result = append(result, gin.H{"note": n, "like_count": likes})
+		entry := gin.H{"note": n, "like_count": likes}
+		if n.CoffeeBeanID != nil {
+			if info, ok := beanMap[*n.CoffeeBeanID]; ok {
+				entry["bean"] = info
+			}
+		}
+		result = append(result, entry)
 	}
 	c.JSON(http.StatusOK, dto.OK(dto.PageData{List: result, Total: total, Page: page, Size: pageSize}))
 }
@@ -67,7 +80,16 @@ func (h *NoteHandler) Get(c *gin.Context) {
 		return
 	}
 	likes, _ := h.likeSvc.CountByNote(n.ID)
-	c.JSON(http.StatusOK, dto.OK(gin.H{"note": n, "like_count": likes}))
+	data := gin.H{"note": n, "like_count": likes}
+	bean, err := h.svc.BeanInfo(n.CoffeeBeanID)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	if bean != nil {
+		data["bean"] = bean
+	}
+	c.JSON(http.StatusOK, dto.OK(data))
 }
 
 // Create handles POST /notes.
@@ -78,7 +100,8 @@ func (h *NoteHandler) Create(c *gin.Context) {
 		return
 	}
 	n := &model.TastingNote{
-		CoffeeName: req.CoffeeName, Origin: req.Origin, RoastLevel: req.RoastLevel,
+		CoffeeBeanID: req.CoffeeBeanID,
+		CoffeeName:   req.CoffeeName, Origin: req.Origin, RoastLevel: req.RoastLevel,
 		FlavorTags: req.FlavorTags, AromaScore: req.AromaScore, AcidityScore: req.AcidityScore,
 		BodyScore: req.BodyScore, OverallScore: req.OverallScore, BrewMethod: req.BrewMethod,
 		BrewRecipeID: req.BrewRecipeID, NotesText: req.NotesText, ImageURL: req.ImageURL,
@@ -98,17 +121,29 @@ func (h *NoteHandler) Update(c *gin.Context) {
 		c.Error(util.NewAppError(http.StatusBadRequest, constants.CodeBadRequest, "invalid note id"))
 		return
 	}
+	// Bind twice from the cached body to distinguish "coffee_bean_id absent"
+	// from explicit "coffee_bean_id: 0/null" (which unbinds the note).
 	var req dto.NoteCreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		c.Error(util.NewAppError(http.StatusBadRequest, constants.CodeBadRequest, constants.MsgInvalidParam))
 		return
 	}
+	var raw map[string]json.RawMessage
+	if err := c.ShouldBindBodyWith(&raw, binding.JSON); err != nil {
+		c.Error(util.NewAppError(http.StatusBadRequest, constants.CodeBadRequest, constants.MsgInvalidParam))
+		return
+	}
+	_, beanBindingSet := raw["coffee_bean_id"]
 	n := &model.TastingNote{
 		CoffeeName: req.CoffeeName, Origin: req.Origin, RoastLevel: req.RoastLevel,
 		FlavorTags: req.FlavorTags, AromaScore: req.AromaScore, AcidityScore: req.AcidityScore,
 		BodyScore: req.BodyScore, OverallScore: req.OverallScore, NotesText: req.NotesText,
 	}
-	updated, err := h.svc.Update(middleware.GetUserID(c), uint(id), n)
+	var beanID *uint
+	if req.CoffeeBeanID != nil && *req.CoffeeBeanID > 0 {
+		beanID = req.CoffeeBeanID
+	}
+	updated, err := h.svc.Update(middleware.GetUserID(c), uint(id), n, beanID, beanBindingSet)
 	if err != nil {
 		c.Error(err)
 		return

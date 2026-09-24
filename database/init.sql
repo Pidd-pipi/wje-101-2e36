@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS tasting_notes (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL,
+  coffee_bean_id BIGINT,
   coffee_name VARCHAR(128) NOT NULL,
   origin VARCHAR(128),
   roast_level VARCHAR(16) NOT NULL,
@@ -31,7 +32,8 @@ CREATE TABLE IF NOT EXISTS tasting_notes (
   image_url VARCHAR(255),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  CONSTRAINT fk_note_user FOREIGN KEY (user_id) REFERENCES users(id)
+  CONSTRAINT fk_note_user FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT fk_note_bean FOREIGN KEY (coffee_bean_id) REFERENCES coffee_beans(id)
 );
 
 CREATE TABLE IF NOT EXISTS brew_recipes (
@@ -99,10 +101,10 @@ INSERT INTO brew_recipes (user_id, name, device, water_temp, grind_size, ratio, 
   (2, '手冲三段式', '手冲壶', 92, '中细', '1:15', '[{"step_number":1,"description":"闷蒸30秒","duration_seconds":30},{"step_number":2,"description":"第一段注水至150ml","duration_seconds":20},{"step_number":3,"description":"第二段注水至300ml","duration_seconds":30}]'),
   (3, '法压壶经典', '法压壶', 94, '中粗', '1:14', '[{"step_number":1,"description":"注水并搅拌","duration_seconds":10},{"step_number":2,"description":"浸泡4分钟","duration_seconds":240},{"step_number":3,"description":"缓慢压杆","duration_seconds":15}]');
 
-INSERT INTO tasting_notes (user_id, coffee_name, origin, roast_level, flavor_tags, aroma_score, acidity_score, body_score, overall_score, brew_method, brew_recipe_id, notes_text, image_url) VALUES
-  (2, '埃塞俄比亚耶加雪菲', '埃塞俄比亚', 'light', '["柑橘","茉莉"]', 8.5, 8.0, 7.0, 8.3, '手冲', 1, '花香明显，柑橘酸质明亮，回甘持久。', 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600'),
-  (3, '哥伦比亚慧兰', '哥伦比亚', 'medium', '["坚果","焦糖"]', 7.5, 6.8, 7.8, 7.6, '法压', 2, '甜感平衡，坚果香气浓郁。', 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=600'),
-  (2, '哥斯达黎加蜜处理', '哥斯达黎加', 'medium', '["莓果","红糖"]', 8.0, 7.2, 8.0, 7.9, '手冲', 0, '莓果酸甜与红糖甜感交织。', 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=600');
+INSERT INTO tasting_notes (user_id, coffee_bean_id, coffee_name, origin, roast_level, flavor_tags, aroma_score, acidity_score, body_score, overall_score, brew_method, brew_recipe_id, notes_text, image_url) VALUES
+  (2, 1, '埃塞俄比亚耶加雪菲', '埃塞俄比亚', 'light', '["柑橘","茉莉"]', 8.5, 8.0, 7.0, 8.3, '手冲', 1, '花香明显，柑橘酸质明亮，回甘持久。', 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600'),
+  (3, 2, '哥伦比亚慧兰', '哥伦比亚', 'medium', '["坚果","焦糖"]', 7.5, 6.8, 7.8, 7.6, '法压', 2, '甜感平衡，坚果香气浓郁。', 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=600'),
+  (2, 3, '哥斯达黎加蜜处理', '哥斯达黎加', 'medium', '["莓果","红糖"]', 8.0, 7.2, 8.0, 7.9, '手冲', 0, '莓果酸甜与红糖甜感交织。', 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=600');
 
 INSERT INTO comments (note_id, user_id, content) VALUES
   (1, 3, '我也很喜欢这只耶加雪菲，柑橘调太棒了！'),

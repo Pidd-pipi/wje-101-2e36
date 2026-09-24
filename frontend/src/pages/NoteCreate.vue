@@ -85,7 +85,12 @@ async function submit() {
   }
   submitting.value = true
   try {
-    const note = await createNote({ ...form, roast_level: form.roast_level as RoastLevel, brew_recipe_id: form.brew_recipe_id || 0 })
+    const note = await createNote({
+      ...form,
+      coffee_bean_id: beanId.value ?? null,
+      roast_level: form.roast_level as RoastLevel,
+      brew_recipe_id: form.brew_recipe_id || 0,
+    })
     ElMessage.success('品鉴笔记已发布')
     router.push(`/note/${note.id}`)
   } finally {

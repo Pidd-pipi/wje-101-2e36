@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/wjecoffeetaste/wjecoffeetaste/internal/constants"
+	"github.com/wjecoffeetaste/wjecoffeetaste/internal/dto"
 	"github.com/wjecoffeetaste/wjecoffeetaste/internal/model"
 	"github.com/wjecoffeetaste/wjecoffeetaste/internal/repository"
 	"github.com/wjecoffeetaste/wjecoffeetaste/internal/util"
@@ -68,14 +69,34 @@ func (s *BeanService) Update(id uint, b *model.CoffeeBean) (*model.CoffeeBean, e
 		exist.Description = b.Description
 	}
 	if err := s.repo.Update(exist); err != nil {
+		if errors.Is(err, repository.ErrDuplicate) {
+			return nil, util.NewAppError(409, constants.CodeConflict,
+				fmt.Sprintf("CoffeeBean[id=%d] update failed: name exists", id))
+		}
 		return nil, fmt.Errorf("bean update: %w", err)
 	}
 	s.logger.Info(fmt.Sprintf(constants.LogBeanUpdateSuccess, id), "id", id)
 	return exist, nil
 }
 
-// Delete removes a bean (admin).
+// Delete removes a bean (admin). A bean still referenced by tasting notes
+// cannot be removed; the reference count is returned in the error message.
 func (s *BeanService) Delete(id uint) error {
+	if _, err := s.repo.FindByID(id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return util.NewAppError(404, constants.CodeNotFound, fmt.Sprintf("CoffeeBean[id=%d] not found", id))
+		}
+		return fmt.Errorf("bean delete find: %w", err)
+	}
+	count, err := s.repo.CountNotes(id)
+	if err != nil {
+		return fmt.Errorf("bean delete count notes: %w", err)
+	}
+	if count > 0 {
+		s.logger.Warn(fmt.Sprintf(constants.LogBeanDeleteBlocked, id, count), "id", id, "note_count", count)
+		return util.NewAppError(409, constants.CodeConflict,
+			fmt.Sprintf("CoffeeBean[id=%d] delete failed: %d tasting note(s) still reference it", id, count))
+	}
 	if err := s.repo.Delete(id); err != nil {
 		return fmt.Errorf("bean delete: %w", err)
 	}
@@ -83,12 +104,33 @@ func (s *BeanService) Delete(id uint) error {
 	return nil
 }
 
-// List filters beans.
-func (s *BeanService) List(origin, process, keyword string, page, pageSize int) ([]model.CoffeeBean, int64, error) {
+// List filters beans and attaches bound note counts.
+func (s *BeanService) List(origin, process, keyword string, page, pageSize int) ([]dto.BeanWithNoteCount, int64, error) {
 	items, total, err := s.repo.List(origin, process, keyword, page, pageSize)
 	if err != nil {
 		return nil, 0, fmt.Errorf("bean list: %w", err)
 	}
+	ids := make([]uint, 0, len(items))
+	for _, b := range items {
+		ids = append(ids, b.ID)
+	}
+	counts, err := s.repo.CountNotesByIDs(ids)
+	if err != nil {
+		return nil, 0, fmt.Errorf("bean list note counts: %w", err)
+	}
+	out := make([]dto.BeanWithNoteCount, 0, len(items))
+	for _, b := range items {
+		out = append(out, dto.BeanWithNoteCount{
+			ID:            b.ID,
+			Name:          b.Name,
+			Origin:        b.Origin,
+			ProcessMethod: b.ProcessMethod,
+			FlavorTags:    b.FlavorTags,
+			Description:   b.Description,
+			CreatedAt:     b.CreatedAt,
+			NoteCount:     counts[b.ID],
+		})
+	}
 	s.logger.Info(fmt.Sprintf(constants.LogBeanListSuccess, process), "total", total)
-	return items, total, nil
+	return out, total, nil
 }

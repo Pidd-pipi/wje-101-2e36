@@ -23,8 +23,8 @@
         <el-card class="note-card" shadow="hover" @click="$router.push(`/note/${item.note.id}`)">
           <el-image v-if="item.note.image_url" :src="item.note.image_url" fit="cover" class="cover" lazy />
           <div class="body">
-            <h3>{{ item.note.coffee_name }}</h3>
-            <div class="meta">{{ item.note.origin || '-' }} · {{ RoastLevelMap[item.note.roast_level] }} · {{ item.note.brew_method || '-' }}</div>
+            <h3>{{ item.bean?.name || item.note.coffee_name }}</h3>
+            <div class="meta">{{ (item.bean ? item.bean.origin : item.note.origin) || '-' }} · {{ RoastLevelMap[item.note.roast_level] }} · {{ item.note.brew_method || '-' }}</div>
             <ScoreStars :model-value="item.note.overall_score" />
             <FlavorTags :tags="item.note.flavor_tags" />
             <div class="foot">👍 {{ item.like_count }} · {{ formatDate(item.note.created_at) }}</div>

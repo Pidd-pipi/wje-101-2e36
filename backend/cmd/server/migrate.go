@@ -7,6 +7,8 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/wjecoffeetaste/wjecoffeetaste/internal/model"
+	"github.com/wjecoffeetaste/wjecoffeetaste/internal/repository"
+	"github.com/wjecoffeetaste/wjecoffeetaste/internal/service"
 )
 
 func migrate(db *gorm.DB) error {
@@ -65,9 +67,9 @@ func seed(db *gorm.DB) error {
 	}
 
 	notes := []model.TastingNote{
-		{UserID: user.ID, CoffeeName: "埃塞俄比亚耶加雪菲", Origin: "埃塞俄比亚", RoastLevel: "light", FlavorTags: `["柑橘","茉莉"]`, AromaScore: 8.5, AcidityScore: 8.0, BodyScore: 7.0, OverallScore: 8.3, BrewMethod: "手冲", BrewRecipeID: recipes[0].ID, NotesText: "花香明显，柑橘酸质明亮，回甘持久。", ImageURL: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600"},
-		{UserID: user2.ID, CoffeeName: "哥伦比亚慧兰", Origin: "哥伦比亚", RoastLevel: "medium", FlavorTags: `["坚果","焦糖"]`, AromaScore: 7.5, AcidityScore: 6.8, BodyScore: 7.8, OverallScore: 7.6, BrewMethod: "法压", BrewRecipeID: recipes[1].ID, NotesText: "甜感平衡，坚果香气浓郁。", ImageURL: "https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=600"},
-		{UserID: user.ID, CoffeeName: "哥斯达黎加蜜处理", Origin: "哥斯达黎加", RoastLevel: "medium", FlavorTags: `["莓果","红糖"]`, AromaScore: 8.0, AcidityScore: 7.2, BodyScore: 8.0, OverallScore: 7.9, BrewMethod: "手冲", NotesText: "莓果酸甜与红糖甜感交织。", ImageURL: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=600"},
+		{UserID: user.ID, CoffeeBeanID: &beans[0].ID, CoffeeName: "埃塞俄比亚耶加雪菲", Origin: "埃塞俄比亚", RoastLevel: "light", FlavorTags: `["柑橘","茉莉"]`, AromaScore: 8.5, AcidityScore: 8.0, BodyScore: 7.0, OverallScore: 8.3, BrewMethod: "手冲", BrewRecipeID: recipes[0].ID, NotesText: "花香明显，柑橘酸质明亮，回甘持久。", ImageURL: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600"},
+		{UserID: user2.ID, CoffeeBeanID: &beans[1].ID, CoffeeName: "哥伦比亚慧兰", Origin: "哥伦比亚", RoastLevel: "medium", FlavorTags: `["坚果","焦糖"]`, AromaScore: 7.5, AcidityScore: 6.8, BodyScore: 7.8, OverallScore: 7.6, BrewMethod: "法压", BrewRecipeID: recipes[1].ID, NotesText: "甜感平衡，坚果香气浓郁。", ImageURL: "https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=600"},
+		{UserID: user.ID, CoffeeBeanID: &beans[2].ID, CoffeeName: "哥斯达黎加蜜处理", Origin: "哥斯达黎加", RoastLevel: "medium", FlavorTags: `["莓果","红糖"]`, AromaScore: 8.0, AcidityScore: 7.2, BodyScore: 8.0, OverallScore: 7.9, BrewMethod: "手冲", NotesText: "莓果酸甜与红糖甜感交织。", ImageURL: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=600"},
 	}
 	if err := db.Create(&notes).Error; err != nil {
 		return err
@@ -100,5 +102,26 @@ func seed(db *gorm.DB) error {
 
 	logger.Info("wjecoffeetaste seed data created",
 		"users", 3, "beans", len(beans), "recipes", len(recipes), "notes", len(notes), "comments", len(comments))
+	return nil
+}
+
+// backfillNoteBeans links legacy tasting notes to coffee beans by exact
+// coffee_name match. Notes without a name match keep coffee_bean_id NULL.
+func backfillNoteBeans(db *gorm.DB, logger *slog.Logger) error {
+	svc := service.NewNoteService(
+		repository.NewTastingNoteRepository(db),
+		repository.NewCoffeeBeanRepository(db),
+		logger,
+	)
+	if err := svc.BackfillBeanBindings(); err != nil {
+		return err
+	}
+	var unmatched int64
+	if err := db.Model(&model.TastingNote{}).Where("coffee_bean_id IS NULL").Count(&unmatched).Error; err != nil {
+		return err
+	}
+	if unmatched > 0 {
+		logger.Warn("tasting notes left unbound after bean backfill", "unmatched", unmatched)
+	}
 	return nil
 }

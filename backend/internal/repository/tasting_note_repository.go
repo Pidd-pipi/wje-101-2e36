@@ -10,10 +10,14 @@ import (
 type TastingNoteRepository struct{ db *gorm.DB }
 
 // NewTastingNoteRepository creates the repository.
-func NewTastingNoteRepository(db *gorm.DB) *TastingNoteRepository { return &TastingNoteRepository{db: db} }
+func NewTastingNoteRepository(db *gorm.DB) *TastingNoteRepository {
+	return &TastingNoteRepository{db: db}
+}
 
 // Create inserts a note.
-func (r *TastingNoteRepository) Create(n *model.TastingNote) error { return translate(r.db.Create(n).Error) }
+func (r *TastingNoteRepository) Create(n *model.TastingNote) error {
+	return translate(r.db.Create(n).Error)
+}
 
 // FindByID locates a note by id.
 func (r *TastingNoteRepository) FindByID(id uint) (*model.TastingNote, error) {
@@ -25,7 +29,9 @@ func (r *TastingNoteRepository) FindByID(id uint) (*model.TastingNote, error) {
 }
 
 // Update persists a note.
-func (r *TastingNoteRepository) Update(n *model.TastingNote) error { return translate(r.db.Save(n).Error) }
+func (r *TastingNoteRepository) Update(n *model.TastingNote) error {
+	return translate(r.db.Save(n).Error)
+}
 
 // Delete removes a note by id.
 func (r *TastingNoteRepository) Delete(id uint) error {
@@ -97,4 +103,32 @@ func (r *TastingNoteRepository) TopOrigins(userID uint) ([]string, error) {
 		return nil, err
 	}
 	return origins, nil
+}
+
+// ListUnbound returns notes without a coffee bean binding.
+func (r *TastingNoteRepository) ListUnbound() ([]model.TastingNote, error) {
+	var items []model.TastingNote
+	if err := r.db.Where("coffee_bean_id IS NULL").Find(&items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+// BindBean links a note to a coffee bean.
+func (r *TastingNoteRepository) BindBean(noteID, beanID uint) error {
+	return translate(r.db.Model(&model.TastingNote{}).
+		Where("id = ?", noteID).
+		Update("coffee_bean_id", beanID).Error)
+}
+
+// FindBeanByIDs loads beans referenced by notes (for display hydration).
+func (r *TastingNoteRepository) FindBeanByIDs(beanIDs []uint) ([]model.CoffeeBean, error) {
+	var beans []model.CoffeeBean
+	if len(beanIDs) == 0 {
+		return beans, nil
+	}
+	if err := r.db.Where("id IN ?", beanIDs).Find(&beans).Error; err != nil {
+		return nil, err
+	}
+	return beans, nil
 }
