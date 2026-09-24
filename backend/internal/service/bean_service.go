@@ -13,13 +13,14 @@ import (
 
 // BeanService handles coffee bean library.
 type BeanService struct {
-	repo   *repository.CoffeeBeanRepository
-	logger *slog.Logger
+	repo     *repository.CoffeeBeanRepository
+	noteRepo *repository.TastingNoteRepository
+	logger   *slog.Logger
 }
 
 // NewBeanService creates a BeanService.
-func NewBeanService(repo *repository.CoffeeBeanRepository, logger *slog.Logger) *BeanService {
-	return &BeanService{repo: repo, logger: logger}
+func NewBeanService(repo *repository.CoffeeBeanRepository, noteRepo *repository.TastingNoteRepository, logger *slog.Logger) *BeanService {
+	return &BeanService{repo: repo, noteRepo: noteRepo, logger: logger}
 }
 
 // Create adds a bean (admin).
@@ -74,8 +75,22 @@ func (s *BeanService) Update(id uint, b *model.CoffeeBean) (*model.CoffeeBean, e
 	return exist, nil
 }
 
-// Delete removes a bean (admin).
+// Delete removes a bean (admin) only when no tasting note still references it.
 func (s *BeanService) Delete(id uint) error {
+	if _, err := s.repo.FindByID(id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return util.NewAppError(404, constants.CodeNotFound, fmt.Sprintf("CoffeeBean[id=%d] not found", id))
+		}
+		return fmt.Errorf("bean delete find: %w", err)
+	}
+	count, err := s.noteRepo.CountByBean(id)
+	if err != nil {
+		return fmt.Errorf("bean delete count notes: %w", err)
+	}
+	if count > 0 {
+		return util.NewAppError(409, constants.CodeConflict,
+			fmt.Sprintf("CoffeeBean[id=%d] delete rejected: 该豆种仍被 %d 篇品鉴笔记引用，无法撤下", id, count))
+	}
 	if err := s.repo.Delete(id); err != nil {
 		return fmt.Errorf("bean delete: %w", err)
 	}
@@ -83,9 +98,9 @@ func (s *BeanService) Delete(id uint) error {
 	return nil
 }
 
-// List filters beans.
-func (s *BeanService) List(origin, process, keyword string, page, pageSize int) ([]model.CoffeeBean, int64, error) {
-	items, total, err := s.repo.List(origin, process, keyword, page, pageSize)
+// List filters beans with the number of notes bound to each one.
+func (s *BeanService) List(origin, process, keyword string, page, pageSize int) ([]repository.BeanWithNoteCount, int64, error) {
+	items, total, err := s.repo.ListWithNoteCount(origin, process, keyword, page, pageSize)
 	if err != nil {
 		return nil, 0, fmt.Errorf("bean list: %w", err)
 	}

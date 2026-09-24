@@ -55,7 +55,7 @@ const beanId = ref<number>()
 const tagInput = ref<string[]>([])
 const submitting = ref(false)
 const form = reactive({
-  coffee_name: '', origin: '', roast_level: 'light' as string, flavor_tags: '[]',
+  coffee_bean_id: 0, coffee_name: '', origin: '', roast_level: 'light' as string, flavor_tags: '[]',
   aroma_score: 0, acidity_score: 0, body_score: 0, overall_score: 0,
   brew_method: '', brew_recipe_id: 0, notes_text: '', image_url: '',
 })
@@ -71,6 +71,7 @@ onMounted(async () => {
 
 function onBeanChange(id: number | undefined) {
   const b = beans.value.find((x) => x.id === id)
+  form.coffee_bean_id = b ? b.id : 0
   if (!b) return
   form.coffee_name = b.name
   form.origin = b.origin
@@ -85,7 +86,7 @@ async function submit() {
   }
   submitting.value = true
   try {
-    const note = await createNote({ ...form, roast_level: form.roast_level as RoastLevel, brew_recipe_id: form.brew_recipe_id || 0 })
+    const note = await createNote({ ...form, roast_level: form.roast_level as RoastLevel, coffee_bean_id: form.coffee_bean_id || 0, brew_recipe_id: form.brew_recipe_id || 0 })
     ElMessage.success('品鉴笔记已发布')
     router.push(`/note/${note.id}`)
   } finally {

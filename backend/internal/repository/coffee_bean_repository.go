@@ -62,3 +62,39 @@ func (r *CoffeeBeanRepository) List(origin, process, keyword string, page, pageS
 	}
 	return items, total, nil
 }
+
+// BeanWithNoteCount pairs a bean with the number of notes bound to it.
+type BeanWithNoteCount struct {
+	model.CoffeeBean
+	NoteCount int64 `gorm:"column:note_count" json:"note_count"`
+}
+
+// ListWithNoteCount filters beans like List and attaches the related note count.
+func (r *CoffeeBeanRepository) ListWithNoteCount(origin, process, keyword string, page, pageSize int) ([]BeanWithNoteCount, int64, error) {
+	var items []BeanWithNoteCount
+	var total int64
+	countQ := r.db.Model(&model.CoffeeBean{})
+	listQ := r.db.Table("coffee_beans").
+		Select("coffee_beans.*, COALESCE(note_counts.cnt, 0) AS note_count").
+		Joins("LEFT JOIN (SELECT coffee_bean_id, COUNT(*) AS cnt FROM tasting_notes WHERE coffee_bean_id > 0 GROUP BY coffee_bean_id) AS note_counts ON note_counts.coffee_bean_id = coffee_beans.id")
+	if origin != "" {
+		countQ = countQ.Where("origin = ?", origin)
+		listQ = listQ.Where("coffee_beans.origin = ?", origin)
+	}
+	if process != "" {
+		countQ = countQ.Where("process_method = ?", process)
+		listQ = listQ.Where("coffee_beans.process_method = ?", process)
+	}
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		countQ = countQ.Where("name LIKE ? OR flavor_tags LIKE ?", like, like)
+		listQ = listQ.Where("coffee_beans.name LIKE ? OR coffee_beans.flavor_tags LIKE ?", like, like)
+	}
+	if err := countQ.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if err := listQ.Order("coffee_beans.id ASC").Offset((page - 1) * pageSize).Limit(pageSize).Scan(&items).Error; err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}

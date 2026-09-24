@@ -13,13 +13,40 @@ import (
 
 // NoteService handles tasting notes.
 type NoteService struct {
-	repo   *repository.TastingNoteRepository
-	logger *slog.Logger
+	repo     *repository.TastingNoteRepository
+	beanRepo *repository.CoffeeBeanRepository
+	logger   *slog.Logger
 }
 
 // NewNoteService creates a NoteService.
-func NewNoteService(repo *repository.TastingNoteRepository, logger *slog.Logger) *NoteService {
-	return &NoteService{repo: repo, logger: logger}
+func NewNoteService(repo *repository.TastingNoteRepository, beanRepo *repository.CoffeeBeanRepository, logger *slog.Logger) *NoteService {
+	return &NoteService{repo: repo, beanRepo: beanRepo, logger: logger}
+}
+
+// NoteDetail is a note paired with the latest profile of the bean it binds to.
+type NoteDetail struct {
+	Note       *model.TastingNote `json:"note"`
+	CoffeeBean *model.CoffeeBean  `json:"coffee_bean"`
+}
+
+// bindBean validates the selected bean and syncs the name/origin snapshot onto
+// the note. A zero beanID means the note stays unbound and is left untouched.
+func (s *NoteService) bindBean(n *model.TastingNote, beanID uint) error {
+	if beanID == 0 {
+		return nil
+	}
+	b, err := s.beanRepo.FindByID(beanID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return util.NewAppError(422, constants.CodeValidationError,
+				fmt.Sprintf("TastingNote[coffee_bean_id=%d] bind failed: coffee bean not found", beanID))
+		}
+		return fmt.Errorf("note bind bean find: %w", err)
+	}
+	n.CoffeeBeanID = b.ID
+	n.CoffeeName = b.Name
+	n.Origin = b.Origin
+	return nil
 }
 
 // Create adds a note for a user.
@@ -27,6 +54,9 @@ func (s *NoteService) Create(userID uint, n *model.TastingNote) (*model.TastingN
 	if !constants.IsValidRoastLevel(n.RoastLevel) {
 		return nil, util.NewAppError(422, constants.CodeValidationError,
 			fmt.Sprintf("TastingNote[roast_level=%s] create failed: invalid roast level", n.RoastLevel))
+	}
+	if err := s.bindBean(n, n.CoffeeBeanID); err != nil {
+		return nil, err
 	}
 	n.UserID = userID
 	if n.FlavorTags == "" {
@@ -36,7 +66,7 @@ func (s *NoteService) Create(userID uint, n *model.TastingNote) (*model.TastingN
 		s.logger.Error(fmt.Sprintf(constants.LogNoteCreateFailed, n.CoffeeName), "error", err)
 		return nil, fmt.Errorf("note create: %w", err)
 	}
-	s.logger.Info(fmt.Sprintf(constants.LogNoteCreateSuccess, n.CoffeeName), "id", n.ID)
+	s.logger.Info(fmt.Sprintf(constants.LogNoteCreateSuccess, n.CoffeeName), "id", n.ID, "coffee_bean_id", n.CoffeeBeanID)
 	return n, nil
 }
 
@@ -52,6 +82,28 @@ func (s *NoteService) Get(id uint) (*model.TastingNote, error) {
 	return n, nil
 }
 
+// GetWithBean returns a note together with the latest profile of its bound
+// bean. Unbound notes keep a nil bean so the caller falls back to the snapshot.
+func (s *NoteService) GetWithBean(id uint) (*NoteDetail, error) {
+	n, err := s.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	detail := &NoteDetail{Note: n}
+	if n.CoffeeBeanID > 0 {
+		b, err := s.beanRepo.FindByID(n.CoffeeBeanID)
+		switch {
+		case err == nil:
+			detail.CoffeeBean = b
+		case errors.Is(err, repository.ErrNotFound):
+			s.logger.Warn(fmt.Sprintf(constants.LogNoteBeanMissing, id, n.CoffeeBeanID))
+		default:
+			return nil, fmt.Errorf("note get bean: %w", err)
+		}
+	}
+	return detail, nil
+}
+
 // Update edits a note owned by the user.
 func (s *NoteService) Update(userID, id uint, n *model.TastingNote) (*model.TastingNote, error) {
 	exist, err := s.repo.FindByID(id)
@@ -62,17 +114,21 @@ func (s *NoteService) Update(userID, id uint, n *model.TastingNote) (*model.Tast
 		return nil, util.NewAppError(403, constants.CodeForbidden,
 			fmt.Sprintf("TastingNote[id=%d] update failed: user_id=%d not owner", id, userID))
 	}
-	if n.CoffeeName != "" {
-		exist.CoffeeName = n.CoffeeName
-	}
-	if n.Origin != "" {
-		exist.Origin = n.Origin
-	}
 	if n.RoastLevel != "" {
 		if !constants.IsValidRoastLevel(n.RoastLevel) {
 			return nil, util.NewAppError(422, constants.CodeValidationError, "invalid roast level")
 		}
 		exist.RoastLevel = n.RoastLevel
+	}
+	if n.CoffeeBeanID > 0 {
+		if err := s.bindBean(exist, n.CoffeeBeanID); err != nil {
+			return nil, err
+		}
+	} else if n.CoffeeName != "" {
+		exist.CoffeeName = n.CoffeeName
+	}
+	if n.Origin != "" && n.CoffeeBeanID == 0 {
+		exist.Origin = n.Origin
 	}
 	if n.FlavorTags != "" {
 		exist.FlavorTags = n.FlavorTags

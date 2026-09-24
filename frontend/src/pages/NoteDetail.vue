@@ -5,8 +5,14 @@
       <el-col :xs="24" :md="14">
         <el-card>
           <el-image v-if="note.image_url" :src="note.image_url" fit="cover" class="cover" />
-          <h1>{{ note.coffee_name }}</h1>
-          <div class="meta">{{ note.origin || '-' }} · {{ RoastLevelMap[note.roast_level] }} · {{ note.brew_method || '-' }}</div>
+          <h1>{{ displayName }}</h1>
+          <div class="meta">
+            {{ displayOrigin || '-' }} · {{ RoastLevelMap[note.roast_level] }} · {{ note.brew_method || '-' }}
+          </div>
+          <div v-if="bean" class="meta">
+            <el-tag size="small" type="warning">{{ ProcessMethodMap[bean.process_method] }}</el-tag>
+            <span class="bean-link">来自豆种库档案</span>
+          </div>
           <ScoreStars :model-value="note.overall_score" />
           <FlavorTags :tags="note.flavor_tags" />
           <el-descriptions :column="2" border class="scores">
@@ -61,6 +67,8 @@ import { getNote, listComments, createComment, likeNote, unlikeNote, deleteNote 
 import { getRecipe } from '@/api/recipe'
 import { useAuth } from '@/hooks/useAuth'
 import { RoastLevelMap, type TastingNote } from '@/constants/note'
+import { ProcessMethodMap } from '@/constants/bean'
+import type { CoffeeBean } from '@/constants/bean'
 import type { Comment, BrewRecipe, RecipeStep } from '@/types/api'
 import { formatDateTime } from '@/utils/dateFormat'
 
@@ -68,6 +76,7 @@ const route = useRoute()
 const router = useRouter()
 const { isLoggedIn, user } = useAuth()
 const note = ref<TastingNote | null>(null)
+const bean = ref<CoffeeBean | null>(null)
 const likeCount = ref(0)
 const liked = ref(false)
 const liking = ref(false)
@@ -75,6 +84,9 @@ const comments = ref<Comment[]>([])
 const reply = ref('')
 const replying = ref(false)
 const recipe = ref<BrewRecipe | null>(null)
+
+const displayName = computed(() => bean.value?.name || note.value?.coffee_name || '')
+const displayOrigin = computed(() => bean.value?.origin || note.value?.origin || '')
 
 const steps = computed<RecipeStep[]>(() => {
   try {
@@ -89,6 +101,7 @@ onMounted(async () => {
   const id = route.params.id as string
   const res = await getNote(id)
   note.value = res.note
+  bean.value = res.coffee_bean
   likeCount.value = res.like_count
   comments.value = await listComments(res.note.id)
   if (res.note.brew_recipe_id) {
@@ -150,6 +163,7 @@ async function remove() {
 .page { max-width: 1000px; margin: 0 auto; }
 .cover { width: 100%; max-height: 360px; border-radius: 8px; }
 .meta { color: #999; margin: 8px 0; }
+.bean-link { margin-left: 8px; color: #b8860b; font-size: 12px; }
 .scores { margin-top: 12px; }
 .notes { line-height: 1.8; margin-top: 12px; }
 .actions { margin-top: 16px; display: flex; gap: 12px; }

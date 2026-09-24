@@ -2,6 +2,7 @@ package dto
 
 // NoteCreateRequest creates/updates a tasting note.
 type NoteCreateRequest struct {
+	CoffeeBeanID uint    `json:"coffee_bean_id"`
 	CoffeeName   string  `json:"coffee_name" binding:"required,max=128"`
 	Origin       string  `json:"origin" binding:"omitempty,max=128"`
 	RoastLevel   string  `json:"roast_level" binding:"required"`

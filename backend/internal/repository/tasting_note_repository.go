@@ -98,3 +98,27 @@ func (r *TastingNoteRepository) TopOrigins(userID uint) ([]string, error) {
 	}
 	return origins, nil
 }
+
+// CountByBean returns how many notes are bound to a bean.
+func (r *TastingNoteRepository) CountByBean(beanID uint) (int64, error) {
+	var count int64
+	if err := r.db.Model(&model.TastingNote{}).
+		Where("coffee_bean_id = ?", beanID).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// BackfillBeanBindings links legacy notes (coffee_bean_id = 0) to beans by an
+// exact coffee_name match and returns the number of notes linked.
+func (r *TastingNoteRepository) BackfillBeanBindings() (int64, error) {
+	res := r.db.Exec(`
+UPDATE tasting_notes AS n
+SET coffee_bean_id = b.id
+FROM coffee_beans AS b
+WHERE n.coffee_bean_id = 0 AND n.coffee_name = b.name`)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
+}

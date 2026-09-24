@@ -11,6 +11,7 @@ export const ROAST_LEVELS = Object.keys(RoastLevelMap) as RoastLevel[]
 export interface TastingNote {
   id: number
   user_id: number
+  coffee_bean_id: number
   coffee_name: string
   origin: string
   roast_level: RoastLevel

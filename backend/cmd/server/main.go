@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,6 +15,8 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/wjecoffeetaste/wjecoffeetaste/internal/config"
+	"github.com/wjecoffeetaste/wjecoffeetaste/internal/constants"
+	"github.com/wjecoffeetaste/wjecoffeetaste/internal/repository"
 	"github.com/wjecoffeetaste/wjecoffeetaste/internal/router"
 	"github.com/wjecoffeetaste/wjecoffeetaste/internal/util"
 )
@@ -33,6 +36,12 @@ func main() {
 		logger.Error("failed to migrate database", "error", err)
 		os.Exit(1)
 	}
+	linked, err := repository.NewTastingNoteRepository(db).BackfillBeanBindings()
+	if err != nil {
+		logger.Error("failed to backfill tasting note bean bindings", "error", err)
+		os.Exit(1)
+	}
+	logger.Info(fmt.Sprintf(constants.LogNoteBeanBackfill, linked))
 	if err := seed(db); err != nil {
 		logger.Error("failed to seed database", "error", err)
 		os.Exit(1)

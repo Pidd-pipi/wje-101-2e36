@@ -1,12 +1,19 @@
 import request from '@/utils/request'
 import type { NoteItem, TastingNote } from '@/constants/note'
+import type { CoffeeBean } from '@/constants/bean'
 import type { PageData } from '@/types/api'
 import type { Comment } from '@/types/api'
+
+export interface NoteDetailData {
+  note: TastingNote
+  coffee_bean: CoffeeBean | null
+  like_count: number
+}
 
 export function listNotes(params: { page?: number; page_size?: number; roast?: string; origin?: string; keyword?: string; sort?: string }) {
   return request.get<never, PageData<NoteItem>>('/notes', { params })
 }
-export function getNote(id: number | string) { return request.get<never, { note: TastingNote; like_count: number }>(`/notes/${id}`) }
+export function getNote(id: number | string) { return request.get<never, NoteDetailData>(`/notes/${id}`) }
 export function createNote(payload: Partial<TastingNote>) { return request.post<never, TastingNote>('/notes', payload) }
 export function updateNote(id: number, payload: Partial<TastingNote>) { return request.put<never, TastingNote>(`/notes/${id}`, payload) }
 export function deleteNote(id: number) { return request.delete<never, { deleted: boolean }>(`/notes/${id}`) }

@@ -11,6 +11,8 @@ const (
 	LogNoteUpdateSuccess      = "tasting note updated: id=%d"
 	LogNoteDeleteSuccess      = "tasting note deleted: id=%d"
 	LogNoteListSuccess        = "tasting note list success: roast=%s page=%d"
+	LogNoteBeanMissing        = "tasting note bound bean missing: note_id=%d coffee_bean_id=%d"
+	LogNoteBeanBackfill       = "tasting note bean bindings backfilled: linked=%d"
 	LogNoteLikeSuccess        = "tasting note liked: id=%d"
 	LogNoteLikeFailed         = "tasting note like failed: id=%d"
 	LogCommentCreateSuccess   = "comment created: note_id=%d"

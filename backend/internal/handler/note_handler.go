@@ -61,13 +61,13 @@ func (h *NoteHandler) Get(c *gin.Context) {
 		c.Error(util.NewAppError(http.StatusBadRequest, constants.CodeBadRequest, "invalid note id"))
 		return
 	}
-	n, err := h.svc.Get(uint(id))
+	n, err := h.svc.GetWithBean(uint(id))
 	if err != nil {
 		c.Error(err)
 		return
 	}
-	likes, _ := h.likeSvc.CountByNote(n.ID)
-	c.JSON(http.StatusOK, dto.OK(gin.H{"note": n, "like_count": likes}))
+	likes, _ := h.likeSvc.CountByNote(n.Note.ID)
+	c.JSON(http.StatusOK, dto.OK(gin.H{"note": n.Note, "coffee_bean": n.CoffeeBean, "like_count": likes}))
 }
 
 // Create handles POST /notes.
@@ -78,7 +78,7 @@ func (h *NoteHandler) Create(c *gin.Context) {
 		return
 	}
 	n := &model.TastingNote{
-		CoffeeName: req.CoffeeName, Origin: req.Origin, RoastLevel: req.RoastLevel,
+		CoffeeBeanID: req.CoffeeBeanID, CoffeeName: req.CoffeeName, Origin: req.Origin, RoastLevel: req.RoastLevel,
 		FlavorTags: req.FlavorTags, AromaScore: req.AromaScore, AcidityScore: req.AcidityScore,
 		BodyScore: req.BodyScore, OverallScore: req.OverallScore, BrewMethod: req.BrewMethod,
 		BrewRecipeID: req.BrewRecipeID, NotesText: req.NotesText, ImageURL: req.ImageURL,
@@ -104,7 +104,7 @@ func (h *NoteHandler) Update(c *gin.Context) {
 		return
 	}
 	n := &model.TastingNote{
-		CoffeeName: req.CoffeeName, Origin: req.Origin, RoastLevel: req.RoastLevel,
+		CoffeeBeanID: req.CoffeeBeanID, CoffeeName: req.CoffeeName, Origin: req.Origin, RoastLevel: req.RoastLevel,
 		FlavorTags: req.FlavorTags, AromaScore: req.AromaScore, AcidityScore: req.AcidityScore,
 		BodyScore: req.BodyScore, OverallScore: req.OverallScore, NotesText: req.NotesText,
 	}

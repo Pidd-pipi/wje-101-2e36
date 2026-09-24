@@ -6,6 +6,7 @@ import "time"
 type TastingNote struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
 	UserID        uint      `gorm:"index;not null" json:"user_id"`
+	CoffeeBeanID  uint      `gorm:"index;not null;default:0" json:"coffee_bean_id"`
 	CoffeeName    string    `gorm:"size:128;not null" json:"coffee_name"`
 	Origin        string    `gorm:"size:128" json:"origin"`
 	RoastLevel    string    `gorm:"size:16;index;not null" json:"roast_level"`
